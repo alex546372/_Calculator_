@@ -1,135 +1,262 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Калькулятор уравнений</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
-<style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f5; padding: 20px; }
-    h2 { color: #333; }
-    input, button { padding: 10px; margin: 5px 0; width: 100%; font-size: 1rem; border-radius: 5px; border: 1px solid #ccc; }
-    button { background: #4CAF50; color: white; cursor: pointer; transition: 0.3s; }
-    button:hover { background: #45a049; }
-    #solution { background: #fff; padding: 20px; border-radius: 10px; margin-top: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);}
-    .step { margin-bottom: 15px; padding: 10px; border-left: 4px solid #4CAF50; background: #f9f9f9; }
-    code { background: #eee; padding: 2px 5px; border-radius: 3px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quadratic Equation Calculator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MathJax -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: { 
+                fontCache: 'global',
+                textInferred: true
+            },
+            chtml: {
+                displayAlign: 'center'
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        /* Оптимизация для мобильных устройств */
+        input, button {
+            touch-action: manipulation;
+        }
+        .step-card {
+            word-break: break-word;
+            transition: transform 0.2s ease;
+        }
+        /* Кастомный скроллбар для темной темы */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        
+        /* Исправление цвета MathJax для темной темы */
+        .mjx-chtml {
+            color: white !important;
+        }
+    </style>
 </head>
-<body>
+<body class="bg-slate-950 min-h-screen text-slate-200 font-sans pb-10">
 
-<h2>Калькулятор уравнений</h2>
-<p>Введите квадратное, неполное или линейное уравнение:</p>
-<input type="text" id="equation" placeholder="Примеры: x^2+6=0, x^2+5x=0, 3x+5=0">
-<button onclick="solveEquation()">Решить</button>
+    <div class="max-w-xl mx-auto px-4 py-8 md:py-16">
+        <!-- Header -->
+        <div class="text-center mb-10">
+            <h1 class="text-3xl md:text-5xl font-black text-white mb-3 tracking-tighter">
+                Quadratic <span class="text-indigo-500">Calculator</span>
+            </h1>
+            <p class="text-slate-400 text-sm md:text-base font-medium">Пошаговое решение уравнений любой сложности</p>
+        </div>
 
-<div id="solution"></div>
+        <!-- Input Section -->
+        <div class="bg-slate-900 p-6 md:p-8 rounded-[2rem] shadow-2xl border border-slate-800 mb-8">
+            <label class="block text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-3 ml-1">Введите уравнение</label>
+            <input type="text" id="equationInput" 
+                class="w-full px-6 py-4 rounded-2xl border-2 border-slate-800 bg-slate-950 focus:border-indigo-500 text-white outline-none text-xl transition-all mb-6 placeholder:text-slate-700"
+                placeholder="x^2 + 5x = -6"
+                onkeypress="if(event.key==='Enter') solve('d')">
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button onclick="solve('d')" 
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-indigo-900/20 active:scale-95 text-sm md:text-base">
+                    Дискриминант
+                </button>
+                <button onclick="solve('v')" 
+                    class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 rounded-2xl transition-all border border-slate-700 active:scale-95 text-sm md:text-base">
+                    Метод Виета
+                </button>
+            </div>
+        </div>
 
-<script>
-function parseEquation(equation) {
-    equation = equation.replace(/\s+/g, '').replace('=0','');
+        <!-- Result Status -->
+        <div id="statusMessage" class="hidden mb-6"></div>
 
-    // Квадратное полное или неполное
-    let match = equation.match(/([+-]?\d*\.?\d*)x\^2([+-]?\d*\.?\d*)x?([+-]?\d*\.?\d*)?/);
-    if (match) {
-        let a = match[1] === '' || match[1] === '+' ? 1 : (match[1] === '-' ? -1 : parseFloat(match[1]));
-        let b = match[2] === '' || match[2] === '+' ? 0 : (match[2] === '-' ? -1 : parseFloat(match[2]));
-        let c = match[3] === undefined || match[3] === '' ? 0 : parseFloat(match[3]);
-        return {type: 'quadratic', a, b, c};
-    }
+        <!-- Solution Display -->
+        <div id="solutionOutput" class="space-y-5">
+            <!-- Results will appear here -->
+        </div>
+    </div>
 
-    // Линейное
-    match = equation.match(/([+-]?\d*\.?\d*)x([+-]?\d*\.?\d+)/);
-    if (match) {
-        let b = match[1] === '' || match[1] === '+' ? 1 : (match[1] === '-' ? -1 : parseFloat(match[1]));
-        let c = parseFloat(match[2]);
-        return {type: 'linear', b, c};
-    }
+    <script>
+        function solve(method) {
+            const input = document.getElementById('equationInput').value.trim();
+            const output = document.getElementById('solutionOutput');
+            const status = document.getElementById('statusMessage');
+            
+            output.innerHTML = "";
+            status.classList.add('hidden');
 
-    return null;
-}
+            if (!input) return;
 
-function solveEquation() {
-    const eqInput = document.getElementById('equation').value;
-    const solDiv = document.getElementById('solution');
-    const parsed = parseEquation(eqInput);
+            try {
+                const parsed = parseComplexEquation(input);
+                if (!parsed) throw new Error("Не удалось распознать уравнение или переменную");
 
-    if (!parsed) {
-        solDiv.innerHTML = '<p style="color:red;">Не удалось распознать уравнение. Попробуйте формат: x^2+bx+c=0 или bx+c=0</p>';
-        return;
-    }
+                const { a, b, c, v } = parsed;
 
-    let steps = '';
-
-    if (parsed.type === 'quadratic') {
-        const {a, b, c} = parsed;
-        steps += `<div class="step"><strong>Уравнение:</strong> ${a}x² + ${b}x + ${c} = 0</div>`;
-
-        if (b === 0 && c === 0) {
-            // x^2 = 0
-            steps += `<div class="step">Уравнение: ${a}x² = 0 → x = 0</div>`;
-        } else if (b === 0) {
-            // ax^2 + c = 0
-            steps += `<div class="step">Неполное квадратное: ${a}x² + ${c} = 0</div>`;
-            const x1 = Math.sqrt(-c / a);
-            const x2 = -x1;
-            steps += `<div class="step">x² = ${-c}/${a} = ${-c/a}</div>`;
-            if (-c / a < 0) {
-                steps += `<div class="step" style="color:red;">Нет действительных корней (под корнем отрицательное число)</div>`;
-            } else {
-                steps += `<div class="step">x = ±√(${ -c/a }) → x₁ = ${x1}, x₂ = ${x2}</div>`;
+                if (a === 0) {
+                    renderLinear(b, c, v);
+                } else {
+                    if (method === 'v') {
+                        renderVieta(a, b, c, v);
+                    } else {
+                        renderDiscriminant(a, b, c, v);
+                    }
+                }
+                
+                MathJax.typesetPromise();
+            } catch (e) {
+                status.innerHTML = `<div class="bg-red-950/50 text-red-400 p-5 rounded-2xl border border-red-900/50 text-sm font-medium text-center">${e.message}</div>`;
+                status.classList.remove('hidden');
             }
-        } else if (c === 0) {
-            // ax^2 + bx = 0
-            steps += `<div class="step">Неполное квадратное: ${a}x² + ${b}x = 0</div>`;
-            steps += `<div class="step">Вынесем x за скобку: x(${a}x + ${b}) = 0</div>`;
-            const x1 = 0;
-            const x2 = -b/a;
-            steps += `<div class="step">x₁ = 0</div>`;
-            steps += `<div class="step">x₂ = -b/a = -(${b})/${a} = ${x2}</div>`;
-        } else if (a === 1) {
-            // Приведенное квадратное, через Виета
-            steps += `<div class="step"><strong>Приведенное уравнение (a=1), используем формулы Виета:</strong></div>`;
-            steps += `<div class="step">Сумма корней: x₁ + x₂ = -b = ${-b}</div>`;
-            steps += `<div class="step">Произведение корней: x₁ * x₂ = c = ${c}</div>`;
-            const D = b*b - 4*a*c;
-            const sqrtD = Math.sqrt(D >= 0 ? D : -D);
-            const x1 = (-b + sqrtD)/(2*a);
-            const x2 = (-b - sqrtD)/(2*a);
-            steps += `<div class="step"><strong>Численные корни:</strong> x₁ = ${x1}, x₂ = ${x2}</div>`;
-        } else {
-            // Полное, через дискриминант
-            const D = b*b - 4*a*c;
-            steps += `<div class="step"><strong>Используем дискриминант:</strong> D = b² - 4ac = ${b}² - 4*${a}*${c} = ${D}</div>`;
-            if (D < 0) {
-                steps += `<div class="step" style="color:red;">Нет действительных корней (D < 0)</div>`;
-            } else {
+        }
+
+        function parseComplexEquation(input) {
+            let side = input.split('=');
+            let left = side[0];
+            let right = side[1] || "0";
+
+            const varMatch = input.match(/[a-z]/i);
+            if (!varMatch) return null;
+            const v = varMatch[0];
+
+            function getCoeffs(str, multiplier) {
+                let a = 0, b = 0, c = 0;
+                const terms = str.replace(/\s+/g, '').replace(/-/g, '+-').split('+').filter(t => t !== "");
+                
+                terms.forEach(term => {
+                    if (term.includes(v + '^2')) {
+                        let co = term.replace(v + '^2', '');
+                        a += (co === "" || co === "+") ? 1 : (co === "-") ? -1 : parseFloat(co);
+                    } else if (term.includes(v)) {
+                        let co = term.replace(v, '');
+                        b += (co === "" || co === "+") ? 1 : (co === "-") ? -1 : parseFloat(co);
+                    } else {
+                        c += parseFloat(term) || 0;
+                    }
+                });
+                return { a: a * multiplier, b: b * multiplier, c: c * multiplier };
+            }
+
+            const L = getCoeffs(left, 1);
+            const R = getCoeffs(right, -1);
+
+            return { a: L.a + R.a, b: L.b + R.b, c: L.c + R.c, v };
+        }
+
+        function renderDiscriminant(a, b, c, v) {
+            const output = document.getElementById('solutionOutput');
+            let html = "";
+
+            html += createStep("Стандартный вид", `Приводим уравнение к каноническому виду: 
+                \\[ ${a}${v}^2 ${b >= 0 ? '+' : ''} ${b}${v} ${c >= 0 ? '+' : ''} ${c} = 0 \\]`);
+
+            const D = b * b - 4 * a * c;
+            html += createStep("Дискриминант", 
+                `Вычисляем по формуле $D = b^2 - 4ac$:
+                \\[ D = (${b})^2 - 4 \\cdot ${a} \\cdot ${c} = ${D} \\]`);
+
+            if (D > 0) {
                 const sqrtD = Math.sqrt(D);
-                const x1 = (-b + sqrtD)/(2*a);
-                const x2 = (-b - sqrtD)/(2*a);
-                steps += `<div class="step">x₁ = (-${b} + √${D}) / (2*${a}) = ${x1}</div>`;
-                steps += `<div class="step">x₂ = (-${b} - √${D}) / (2*${a}) = ${x2}</div>`;
-            }
-        }
-
-    } else if (parsed.type === 'linear') {
-        const {b, c} = parsed;
-        steps += `<div class="step"><strong>Линейное уравнение:</strong> ${b}x + ${c} = 0</div>`;
-        if (b !== 0) {
-            const x = -c / b;
-            steps += `<div class="step">x = -c/b = -(${c}) / (${b}) = ${x}</div>`;
-        } else {
-            if (c === 0) {
-                steps += `<div class="step" style="color:green;">Бесконечно много решений</div>`;
+                const x1 = (-b + sqrtD) / (2 * a);
+                const x2 = (-b - sqrtD) / (2 * a);
+                html += createStep("Корни уравнения", 
+                    `Так как $D > 0$, имеем два различных корня:
+                    \\[ ${v}_{1} = \\frac{-${b} + \\sqrt{${D}}}{2 \\cdot ${a}} = ${parseFloat(x1.toFixed(3))} \\]
+                    \\[ ${v}_{2} = \\frac{-${b} - \\sqrt{${D}}}{2 \\cdot ${a}} = ${parseFloat(x2.toFixed(3))} \\]`);
+            } else if (D === 0) {
+                const x = -b / (2 * a);
+                html += createStep("Корень уравнения", 
+                    `Так как $D = 0$, уравнение имеет один корень:
+                    \\[ ${v} = \\frac{-${b}}{2 \\cdot ${a}} = ${parseFloat(x.toFixed(3))} \\]`);
             } else {
-                steps += `<div class="step" style="color:red;">Решений нет</div>`;
+                html += `<div class="bg-slate-900 p-8 rounded-3xl border border-indigo-900/30 text-indigo-300 text-center font-bold">
+                    Действительных корней нет, так как $D < 0$
+                </div>`;
             }
-        }
-    }
 
-    solDiv.innerHTML = steps;
-}
-</script>
+            output.innerHTML = html;
+        }
+
+        function renderVieta(a, b, c, v) {
+            const output = document.getElementById('solutionOutput');
+            let html = "";
+
+            let finalB = b, finalC = c;
+            if (a !== 1) {
+                finalB = b / a;
+                finalC = c / a;
+                html += createStep("Приведение", 
+                    `Делим уравнение на $a = ${a}$ для получения приведенного вида:
+                    \\[ ${v}^2 ${finalB >= 0 ? '+' : ''} ${parseFloat(finalB.toFixed(2))}${v} ${finalC >= 0 ? '+' : ''} ${parseFloat(finalC.toFixed(2))} = 0 \\]`);
+            }
+
+            const p = finalB;
+            const q = finalC;
+            html += createStep("Система Виета", 
+                `Для приведенного уравнения $x^2 + px + q = 0$:
+                \\[ \\begin{cases} ${v}_1 + ${v}_2 = -p \\\\ ${v}_1 \\cdot ${v}_2 = q \\end{cases} \\implies \\begin{cases} ${v}_1 + ${v}_2 = ${-p} \\\\ ${v}_1 \\cdot ${v}_2 = ${q} \\end{cases} \\]`);
+
+            let roots = null;
+            for (let x1 = -100; x1 <= 100; x1++) {
+                let x2 = (-p) - x1;
+                if (Math.abs((x1 * x2) - q) < 0.001) {
+                    roots = [x1, x2].sort((n1, n2) => n1 - n2);
+                    break;
+                }
+            }
+
+            if (roots) {
+                html += createStep("Результат", 
+                    `Методом подбора находим значения:
+                    \\[ ${v}_1 = ${roots[0]}, \\quad ${v}_2 = ${roots[1]} \\]`);
+            } else {
+                html += `<div class="bg-slate-900 p-8 rounded-3xl border border-slate-800 text-slate-400 text-center">
+                    Целые корни не найдены. <br>
+                    <button onclick="solve('d')" class="mt-4 text-indigo-400 font-bold hover:text-indigo-300 transition-colors uppercase text-xs tracking-widest">Использовать Дискриминант</button>
+                </div>`;
+            }
+
+            output.innerHTML = html;
+        }
+
+        function renderLinear(b, c, v) {
+            const output = document.getElementById('solutionOutput');
+            const x = -c / b;
+            output.innerHTML = createStep("Линейное решение", 
+                `Так как коэффициент при $^2$ равен 0:
+                \\[ ${b}${v} = ${-c} \\implies ${v} = \\frac{${-c}}{${b}} = ${parseFloat(x.toFixed(3))} \\]`);
+        }
+
+        function createStep(title, content) {
+            return `
+                <div class="bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-800 shadow-lg step-card">
+                    <h3 class="text-indigo-500 font-bold uppercase text-[10px] tracking-[0.3em] mb-4 opacity-80">${title}</h3>
+                    <div class="text-white">
+                        ${content}
+                    </div>
+                </div>
+            `;
+        }
+    </script>
 
 </body>
 </html>
